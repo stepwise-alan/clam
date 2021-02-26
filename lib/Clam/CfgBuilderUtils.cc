@@ -4,7 +4,7 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/Analysis/CFG.h"
-#include "llvm/IR/CallSite.h"
+#include "llvm/IR/Instructions.h" 
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DebugInfo.h"
@@ -97,9 +97,9 @@ bool isTracked(const Value &v, const CrabBuilderParams &params) {
 }
 
 bool ShouldCallSiteReturn(CallInst &I, const CrabBuilderParams &params) {
-  CallSite CS(&I);
+  CallBase &CB = I;
   if (Function *Callee =
-          dyn_cast<Function>(CS.getCalledValue()->stripPointerCasts())) {
+          dyn_cast<Function>(CB.getCalledValue()->stripPointerCasts())) {
     Type *RT = Callee->getReturnType();
     return (!(RT->isVoidTy()) && isTrackedType(*RT, params));
   }
@@ -124,14 +124,14 @@ crab::cfg::debug_info getDebugLoc(const Instruction *I) {
 crab::cfg::debug_info getDebugLoc(const Instruction *I, uint32_t Id) {
   if (hasDebugLoc(I)) {
     const DebugLoc &dloc = I->getDebugLoc();
-    unsigned Line = dloc.getLine();
-    unsigned Col = dloc.getCol();
-    std::string File = (*dloc).getFilename();
+  unsigned Line = dloc.getLine();
+  unsigned Col = dloc.getCol();
+  std::string File = (*dloc).getFilename();
     return crab::cfg::debug_info(File, Line, Col, Id == 0 ? -1 : (int64_t) Id);
   } else {
     return crab::cfg::debug_info(Id);
-  } 
-}
+    }
+  }
 
 uint64_t storageSize(const Type *t, const DataLayout &dl) {
   return dl.getTypeStoreSize(const_cast<Type *>(t));
@@ -230,9 +230,9 @@ std::string getCrabIntrinsicName(const Function &F) {
     }
     return res.str();
   } else {
-    StringRef res = F.getName().split("__CRAB_intrinsic_").second;
-    return res.str();
-  }
+  StringRef res = F.getName().split("__CRAB_intrinsic_").second;
+  return res.str();
+}
 }
 
 bool isZeroInitializer(const Function &F) {
@@ -240,8 +240,8 @@ bool isZeroInitializer(const Function &F) {
 }
 
 bool isZeroInitializer(const CallInst &CI) {
-  ImmutableCallSite CS(&CI);
-  const Value *calleeV = CS.getCalledValue();
+  const CallBase &CB = CI;
+  const Value *calleeV = CB.getCalledValue();
   if (const Function *callee =
           dyn_cast<Function>(calleeV->stripPointerCasts())) {
     return isZeroInitializer(*callee);
@@ -254,8 +254,8 @@ bool isIntInitializer(const Function &F) {
 }
 
 bool isIntInitializer(const CallInst &CI) {
-  ImmutableCallSite CS(&CI);
-  const Value *calleeV = CS.getCalledValue();
+  const CallBase &CB = CI;
+  const Value *calleeV = CB.getCalledValue();
   if (const Function *callee =
           dyn_cast<Function>(calleeV->stripPointerCasts())) {
     return isIntInitializer(*callee);
@@ -305,8 +305,8 @@ bool AllUsesAreIndirectCalls(Value &V) {
   // XXX: do not strip pointers here
   for (auto &U : V.uses()) {
     if (CallInst *CI = dyn_cast<CallInst>(U.getUser())) {
-      CallSite CS(CI);
-      const Value *callee = CS.getCalledValue();
+      CallBase &CB = *CI;
+      const Value *callee = CB.getCalledValue();
       if (callee == &V)
         continue;
     }
@@ -329,8 +329,8 @@ bool AllUsesAreVerifierCalls(Value &V, bool goThroughIntegerCasts,
     }
 
     if (CallInst *CI = dyn_cast<CallInst>(User)) {
-      CallSite CS(CI);
-      const Value *calleeV = CS.getCalledValue();
+      CallBase &CB = *CI;
+      const Value *calleeV = CB.getCalledValue();
       const Function *callee = dyn_cast<Function>(calleeV->stripPointerCasts());
       if (callee && (isAssertFn(*callee) || isAssumeFn(*callee) ||
                      isNotAssumeFn(*callee))) {
